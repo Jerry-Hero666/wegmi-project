@@ -151,7 +151,7 @@ export default function SafeTokenTransfer() {
               value={toAddress}
               onChange={(e) => setToAddress(e.target.value)}
               className="w-full p-2 border rounded"
-              placeholder="0x..."
+              placeholder="请输入以0x开头的接收地址"
             />
           </div>
 
@@ -162,7 +162,7 @@ export default function SafeTokenTransfer() {
               value={amountStr}
               onChange={(e) => setAmountStr(e.target.value)}
               className="w-full p-2 border rounded"
-              placeholder="1.0"
+              placeholder="请输入发送数量"
             />
           </div>
 
