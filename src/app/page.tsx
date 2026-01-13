@@ -4,6 +4,7 @@ import SwitchChain from "@/components/SwitchChain";
 import ConnectionState from "@/components/ConnectionState";
 import ConnectWallent from "@/components/ConnectWallent";
 import SafeTokenTransfer from "@/components/SafeTokenTransfer";
+import SendNativeETH from "@/components/SendNativeETH";
 
 function App() {
   // const { mutate } = useReconnect();
@@ -24,6 +25,8 @@ function App() {
       <SwitchChain />
       {/* 安全转账 */}
       <SafeTokenTransfer />
+      {/* 发送原生 ETH */}
+      <SendNativeETH />
     </div>
   );
 }

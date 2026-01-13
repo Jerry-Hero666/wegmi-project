@@ -1,24 +1,45 @@
 "use client";
-import { useState } from "react";
-import { erc20Abi, parseEther, parseUnits } from "viem";
+import { useEffect, useState } from "react";
+import { erc20Abi, formatEther, parseEther, parseGwei, parseUnits } from "viem";
 import {
-  useAccount,
-  useChains,
   useConnection,
+  usePublicClient,
   useSimulateContract,
-  useSwitchChain,
   useWaitForTransactionReceipt,
   useWriteContract,
 } from "wagmi";
 
-const TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // 示例：USDC Mainnet
+const TOKEN_ADDRESS = "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"; // USDC Mainnet
 
 export default function SafeTokenTransfer() {
   const connection = useConnection();
+  const publicClient = usePublicClient(); // 用于获取当前网络 gas 建议值
   const isConnected = connection.status === "connected";
   const [toAddress, setToAddress] = useState("");
   const [amountStr, setAmountStr] = useState("");
+  // 手动 gas 参数状态（用户可调节，或 fallback 时使用）
+  const [manualGasLimit, setManualGasLimit] = useState<string>(""); // e.g. "120000"
+  const [manualGasPrice, setManualGasPrice] = useState<string>(""); // e.g. "5" → 5 gwei
+  const [useManualParams, setUseManualParams] = useState(false); // 是否强制使用手动参数
+  const [currentGasPrice, setCurrentGasPrice] = useState<string>("加载中"); // 当前 gas price
+
   const amount = parseUnits(amountStr || "0", 6);
+
+  // 获取当前 gas price
+  useEffect(() => {
+    const fetchGasPrice = async () => {
+      if (publicClient && useManualParams) {
+        try {
+          const gasPrice = await publicClient.getGasPrice();
+          setCurrentGasPrice(formatEther(gasPrice, "gwei"));
+        } catch (error) {
+          setCurrentGasPrice("获取失败");
+        }
+      }
+    };
+    fetchGasPrice();
+  }, [publicClient, useManualParams]);
+
   // Step 1: 模拟（最关键的安全层）
   const {
     data: simulation,
@@ -37,6 +58,7 @@ export default function SafeTokenTransfer() {
       staleTime: 10_000, // 10秒内不重复模拟
     },
   });
+  console.log("🚀 ~ simulation:", simError);
 
   // Step 2: 实际写入（只有模拟成功才允许）
   const {
@@ -58,38 +80,49 @@ export default function SafeTokenTransfer() {
   });
 
   // 触发写入
-  const handleTransfer = () => {
-    console.log("🚀 ~ simError:", simError);
-    console.log("🚀 ~ simulation:", simulation);
-    if (simulation?.request) {
-      writeContract(simulation.request, {
-        // 可选：onSuccess / onError 回调（v3 仍支持 mutation callbacks）
-        onSuccess: (hash) => {
-          console.log("Transaction sent:", hash);
-        },
-        onError: (err) => {
-          console.error("Write failed:", err);
-        },
-      });
-    }
-  };
+  const handleTransfer = async () => {
+    if (!simulation?.request) return;
 
+    // 基础 request（从 simulate 得来）
+    let request = { ...simulation.request };
+
+    // 如果用户选择手动参数，则覆盖
+    if (useManualParams) {
+      if (manualGasLimit && !isNaN(Number(manualGasLimit))) {
+        request.gas = BigInt(manualGasLimit);
+      }
+
+      if (manualGasPrice && !isNaN(Number(manualGasPrice))) {
+        // gasPrice 以 gwei 为单位输入，转换为 wei
+        request.gasPrice = parseGwei(manualGasPrice);
+      }
+
+      // 注意：如果发送的是原生 ETH 转账（非合约调用），还需要加 value
+      // request.value = parseEther('0.1') // 示例：发送 0.1 ETH
+    }
+    writeContract(request, {
+      onSuccess: (hash) => console.log("Tx sent:", hash),
+      onError: (err) => console.error("Write failed:", err),
+    });
+  };
   // 错误分类处理（面试爱问的点）
   const getErrorMessage = () => {
     if (isSimError && simError) {
       const msg = simError.message.toLowerCase();
       if (msg.includes("insufficient funds")) return "余额不足（ETH 或代币）";
       if (msg.includes("reverted"))
-        return "合约执行失败（可能余额不够/逻辑错误）";
+        return "合约执行会 revert（检查参数或余额）";
       if (msg.includes("gas"))
-        return "Gas 估算失败，请检查网络或手动调整 gasLimit";
+        return "自动 gas 估算失败，可尝试手动设置 gasLimit";
       return `模拟失败: ${simError.message}`;
     }
 
     if (isWriteError && writeError) {
       const msg = writeError.message.toLowerCase();
-      if (msg.includes("user rejected")) return "用户取消了签名";
-      if (msg.includes("insufficient funds")) return "发送交易时余额不足";
+      if (msg.includes("user rejected")) return "已取消签名";
+      if (msg.includes("insufficient funds"))
+        return "发送时 ETH 余额不足支付 gas";
+      if (msg.includes("nonce too low")) return "Nonce 错误，请刷新页面重试";
       return `交易失败: ${writeError.message}`;
     }
 
@@ -132,6 +165,52 @@ export default function SafeTokenTransfer() {
               placeholder="1.0"
             />
           </div>
+
+          {/* 手动 Gas 参数区 - 生产中常作为高级选项 */}
+          <div className="mb-6 p-4 bg-gray-50 rounded border">
+            <label className="flex items-center mb-2">
+              <input
+                type="checkbox"
+                checked={useManualParams}
+                onChange={(e) => setUseManualParams(e.target.checked)}
+                className="mr-2"
+              />
+              <span className="text-sm font-medium">
+                使用手动 Gas 参数（高级）
+              </span>
+            </label>
+
+            {useManualParams && (
+              <>
+                <div className="mb-3">
+                  <label className="block text-xs text-gray-600 mb-1">
+                    Gas Limit
+                  </label>
+                  <input
+                    type="text"
+                    value={manualGasLimit}
+                    onChange={(e) => setManualGasLimit(e.target.value)}
+                    placeholder="eg 120000"
+                    className="w-full p-2 border rounded text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs text-gray-600 mb-1">
+                    Max Gas Price (gwei) - 当前建议: {currentGasPrice}
+                  </label>
+                  <input
+                    type="text"
+                    value={manualGasPrice}
+                    onChange={(e) => setManualGasPrice(e.target.value)}
+                    placeholder="e.g. 5"
+                    className="w-full p-2 border rounded text-sm"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
           <button
             onClick={handleTransfer}
             disabled={
