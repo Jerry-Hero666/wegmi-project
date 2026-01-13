@@ -6,6 +6,12 @@ import ConnectWallent from "@/components/ConnectWallent";
 import SafeTokenTransfer from "@/components/SafeTokenTransfer";
 
 function App() {
+  // const { mutate } = useReconnect();
+
+  // useEffect(() => {
+  // mutate();
+  // }, []);
+
   return (
     <div className="text-center space-y-4 mt-10">
       {/* 连接状态 */}

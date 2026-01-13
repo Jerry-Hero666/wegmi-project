@@ -2,7 +2,7 @@
 import { useConnect, useConnectors } from "wagmi";
 
 export default function ConnectWallent() {
-  const { mutate, status, error } = useConnect();
+  const { mutate, status, error, data } = useConnect();
   const connectors = useConnectors();
   return (
     <div className="bg-indigo-100 p-8">
