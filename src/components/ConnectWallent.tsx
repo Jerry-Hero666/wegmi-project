@@ -2,7 +2,7 @@
 import { useConnect, useConnectors } from "wagmi";
 
 export default function ConnectWallent() {
-  const { connect, status, error } = useConnect();
+  const { mutate, status, error } = useConnect();
   const connectors = useConnectors();
   return (
     <div className="bg-indigo-100 p-8">
@@ -13,7 +13,7 @@ export default function ConnectWallent() {
             className="bg-blue-500 text-white p-2 rounded-md cursor-pointer"
             key={connector.uid}
             onClick={() => {
-              connect({ connector });
+              mutate({ connector });
             }}
             type="button"
           >
