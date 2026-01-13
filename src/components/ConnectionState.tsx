@@ -1,12 +1,6 @@
 "use client";
 import { formatEther } from "viem";
-import {
-  useBalance,
-  useChains,
-  useConnection,
-  useDisconnect,
-  useSwitchChain,
-} from "wagmi";
+import { useBalance, useConnection, useDisconnect } from "wagmi";
 
 export default function ConnectionState() {
   const connection = useConnection();
